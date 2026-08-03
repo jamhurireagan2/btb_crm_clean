@@ -1,0 +1,7 @@
+﻿config/email.php
+*.mp4
+logs/
+*.log
+.vscode/
+.DS_Store
+Thumbs.db
