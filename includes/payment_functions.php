@@ -1,9 +1,7 @@
 <?php
-require_once '../config/payment.php';
+// No need to require config here - it's loaded in dashboard.php
+// Just define functions directly
 
-/**
- * Get payment statistics
- */
 function getPaymentStats() {
     global $pdo;
     
@@ -36,16 +34,10 @@ function getPaymentStats() {
     }
 }
 
-/**
- * Generate unique transaction ID
- */
 function generateTransactionId() {
     return 'TXN-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
 }
 
-/**
- * Create a new payment record
- */
 function createPayment($client_id, $policy_number, $amount, $method) {
     global $pdo;
     
@@ -58,9 +50,6 @@ function createPayment($client_id, $policy_number, $amount, $method) {
     return $pdo->lastInsertId();
 }
 
-/**
- * Update payment status
- */
 function updatePaymentStatus($payment_id, $status, $transaction_id = null) {
     global $pdo;
     
@@ -79,9 +68,6 @@ function updatePaymentStatus($payment_id, $status, $transaction_id = null) {
     return $stmt->execute($params);
 }
 
-/**
- * Get payment by ID
- */
 function getPayment($payment_id) {
     global $pdo;
     
@@ -93,9 +79,6 @@ function getPayment($payment_id) {
     return $stmt->fetch();
 }
 
-/**
- * Get payments by client
- */
 function getClientPayments($client_id) {
     global $pdo;
     
@@ -104,9 +87,6 @@ function getClientPayments($client_id) {
     return $stmt->fetchAll();
 }
 
-/**
- * Get all payments (admin)
- */
 function getAllPayments($limit = 50) {
     global $pdo;
     

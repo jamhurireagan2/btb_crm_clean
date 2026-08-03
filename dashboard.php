@@ -1,12 +1,7 @@
 <?php
 require_once 'config/database.php';
-// Only include payment functions if the file exists
-if (file_exists('includes/payment_functions.php')) {
-    require_once 'includes/payment_functions.php';
-    $paymentStats = getPaymentStats();
-} else {
-    $paymentStats = ['total' => 0, 'total_amount' => 0, 'pending' => 0];
-}
+require_once 'config/payment.php';
+require_once 'includes/payment_functions.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -18,6 +13,9 @@ $totalClients = $pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
 $expiringSoon = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND expiry_date >= CURDATE()")->fetchColumn();
 $expired = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date < CURDATE()")->fetchColumn();
 $activePolicies = $totalClients - $expired;
+
+// Get payment stats
+$paymentStats = getPaymentStats();
 
 // Handle search
 $search_term = $_GET['search'] ?? '';
