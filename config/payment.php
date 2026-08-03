@@ -6,14 +6,14 @@ define('CURRENCY', 'KES');
 define('CURRENCY_SYMBOL', 'KSh');
 
 // PayPal Settings
-define('PAYPAL_ENABLED', true);
+define('PAYPAL_ENABLED', false);
 define('PAYPAL_MODE', 'sandbox');
 define('PAYPAL_CLIENT_ID', '');
 define('PAYPAL_SECRET', '');
-define('PAYPAL_BUSINESS_EMAIL', 'your-business@email.com');
+define('PAYPAL_BUSINESS_EMAIL', '');
 
 // M-Pesa Settings
-define('MPESA_ENABLED', true);
+define('MPESA_ENABLED', false);
 define('MPESA_CONSUMER_KEY', '');
 define('MPESA_CONSUMER_SECRET', '');
 define('MPESA_PASSKEY', '');
