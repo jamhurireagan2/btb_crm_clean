@@ -1,6 +1,12 @@
 <?php
 require_once 'config/database.php';
-require_once 'includes/payment_functions.php'; // ← ADDED for payment stats
+// Only include payment functions if the file exists
+if (file_exists('includes/payment_functions.php')) {
+    require_once 'includes/payment_functions.php';
+    $paymentStats = getPaymentStats();
+} else {
+    $paymentStats = ['total' => 0, 'total_amount' => 0, 'pending' => 0];
+}
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -12,9 +18,6 @@ $totalClients = $pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
 $expiringSoon = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND expiry_date >= CURDATE()")->fetchColumn();
 $expired = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date < CURDATE()")->fetchColumn();
 $activePolicies = $totalClients - $expired;
-
-// Get payment stats
-$paymentStats = getPaymentStats();
 
 // Handle search
 $search_term = $_GET['search'] ?? '';
@@ -41,7 +44,7 @@ if ($search_term) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - BTB Insurance</title>
+    <title>Dashboard - Client Management System</title>
     <link rel="stylesheet" href="assets/style.css?v=<?= time() ?>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -388,7 +391,7 @@ if ($search_term) {
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); /* Changed from 4 to 5 */
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -457,7 +460,7 @@ if ($search_term) {
         /* Quick Actions */
         .quick-actions {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* Changed from 3 to 4 */
+            grid-template-columns: repeat(3, 1fr);
             gap: 12px;
             margin-bottom: 24px;
         }
@@ -743,7 +746,7 @@ if ($search_term) {
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
             .quick-actions { grid-template-columns: repeat(2, 1fr); }
         }
 
@@ -779,8 +782,8 @@ if ($search_term) {
                 <i class="fas fa-bars"></i>
             </button>
             <a href="dashboard.php" class="logo-link">
-    <img src="assets/images/cms-logo-red-white.png" alt="Client Management System" height="40">
-</a>
+                <img src="assets/images/cms-logo-red-white.png" alt="Client Management System" height="40">
+            </a>
         </div>
         <div class="nav-right">
             <div class="nav-search">
@@ -826,9 +829,6 @@ if ($search_term) {
             </a>
             <a href="settings.php">
                 <i class="fas fa-cog"></i> Settings
-            </a>
-            <a href="admin/payments.php">
-                <i class="fas fa-credit-card"></i> Payments
             </a>
         </div>
     </aside>
@@ -885,19 +885,6 @@ if ($search_term) {
                     <i class="fas fa-arrow-down"></i> 3%
                 </div>
             </div>
-            <!-- NEW: Payment Stats Card -->
-            <div class="stat-card">
-                <div class="stat-icon blue">
-                    <i class="fas fa-credit-card"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?= CURRENCY_SYMBOL ?> <?= number_format($paymentStats['total_amount'], 2) ?></h3>
-                    <p>Total Revenue</p>
-                </div>
-                <div class="stat-trend up">
-                    <i class="fas fa-arrow-up"></i> 0%
-                </div>
-            </div>
         </div>
 
         <!-- Quick Actions -->
@@ -910,9 +897,6 @@ if ($search_term) {
             </a>
             <a href="#" class="quick-action">
                 <i class="fas fa-bell"></i> Renewal Alerts
-            </a>
-            <a href="admin/payments.php" class="quick-action">
-                <i class="fas fa-credit-card"></i> Manage Payments
             </a>
         </div>
 
