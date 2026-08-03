@@ -10,6 +10,9 @@ if (!$payment) {
     header('Location: ../user/dashboard.php');
     exit;
 }
+
+// Update payment status to completed
+updatePaymentStatus($payment_id, 'completed');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -36,66 +39,39 @@ if (!$payment) {
             padding: 48px 40px;
             max-width: 480px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
             text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
         }
         .success-icon {
-            width: 80px;
-            height: 80px;
+            width: 80px; height: 80px;
             background: #dcfce7;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             margin: 0 auto 20px;
-            font-size: 40px;
-            color: #22c55e;
+            font-size: 40px; color: #22c55e;
         }
         .success-container h1 {
-            font-size: 28px;
-            font-weight: 700;
-            color: #0f172a;
-            margin-bottom: 8px;
+            font-size: 28px; font-weight: 700;
+            color: #0f172a; margin-bottom: 8px;
         }
-        .success-container p {
-            color: #64748b;
-            font-size: 16px;
-            margin-bottom: 24px;
-        }
+        .success-container p { color: #64748b; font-size: 16px; margin-bottom: 24px; }
         .payment-details {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-            text-align: left;
+            background: #f8fafc; border-radius: 12px; padding: 20px;
+            margin-bottom: 24px; text-align: left;
         }
         .payment-details .row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #e2e8f0;
+            display: flex; justify-content: space-between;
+            padding: 8px 0; border-bottom: 1px solid #e2e8f0;
         }
-        .payment-details .row:last-child {
-            border-bottom: none;
-        }
-        .payment-details .label {
-            color: #64748b;
-        }
-        .payment-details .value {
-            font-weight: 600;
-            color: #0f172a;
-        }
+        .payment-details .row:last-child { border-bottom: none; }
+        .payment-details .label { color: #64748b; }
+        .payment-details .value { font-weight: 600; color: #0f172a; }
         .btn-dashboard {
             padding: 12px 32px;
             background: linear-gradient(135deg, #dc2626, #b91c1c);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
+            color: white; border: none; border-radius: 10px;
+            font-size: 16px; font-weight: 600;
+            cursor: pointer; text-decoration: none; display: inline-block;
             transition: all 0.3s ease;
         }
         .btn-dashboard:hover {

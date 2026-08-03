@@ -601,7 +601,7 @@ if (!$isExpired && $days <= 30):
 
     </div>
     <!-- Payment Quick Action -->
-<div class="quick-actions" style="margin-bottom: 20px;">
+<div class="quick-actions" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
     <a href="../payment/paypal.php" class="quick-action">
         <i class="fab fa-paypal"></i> Pay with PayPal
     </a>
