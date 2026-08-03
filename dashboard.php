@@ -36,6 +36,12 @@ if ($search_term) {
     $stmt = $pdo->query("SELECT * FROM clients ORDER BY created_at DESC LIMIT 50");
     $clients = $stmt->fetchAll();
 }
+
+// Get policy type distribution
+$policyTypes = $pdo->query("SELECT policy_type, COUNT(*) as count FROM clients GROUP BY policy_type")->fetchAll();
+
+// Get monthly data
+$monthlyData = $pdo->query("SELECT DATE_FORMAT(created_at, '%b') as month, COUNT(*) as count FROM clients WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY month ORDER BY created_at ASC")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -106,7 +112,9 @@ if ($search_term) {
         body.dark-mode .sidebar,
         body.dark-mode .stat-card,
         body.dark-mode .table-container,
-        body.dark-mode .quick-action {
+        body.dark-mode .quick-action,
+        body.dark-mode .report-card,
+        body.dark-mode .chart-card {
             background: var(--bg-card);
             border-color: var(--border-color);
         }
@@ -116,7 +124,9 @@ if ($search_term) {
         body.dark-mode .stat-info h3,
         body.dark-mode .table-header h2,
         body.dark-mode .client-name,
-        body.dark-mode .contact-info {
+        body.dark-mode .contact-info,
+        body.dark-mode .report-card h3,
+        body.dark-mode .chart-card h3 {
             color: var(--text-primary);
         }
 
@@ -125,7 +135,8 @@ if ($search_term) {
         body.dark-mode .table-subtitle,
         body.dark-mode .record-count,
         body.dark-mode .client-email,
-        body.dark-mode .content-footer {
+        body.dark-mode .content-footer,
+        body.dark-mode .report-item .label {
             color: var(--text-secondary);
         }
 
@@ -167,6 +178,10 @@ if ($search_term) {
             border-color: var(--border-color);
         }
 
+        body.dark-mode .progress-bar {
+            background: var(--gray-50);
+        }
+
         /* Top Navigation */
         .top-nav {
             position: fixed;
@@ -202,28 +217,16 @@ if ($search_term) {
 
         .mobile-toggle:hover { background: var(--gray-100); }
 
-        .nav-brand {
+        .logo-link {
             display: flex;
             align-items: center;
-            gap: 10px;
+            text-decoration: none;
         }
 
-        .nav-brand .brand-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--red-gradient);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 16px;
-        }
-
-        .nav-brand span {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--gray-900);
+        .logo-link img {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
         }
 
         .nav-right {
@@ -389,7 +392,7 @@ if ($search_term) {
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -455,10 +458,130 @@ if ($search_term) {
         .stat-trend.up { color: var(--success); background: var(--success-light); }
         .stat-trend.down { color: var(--red-primary); background: var(--red-light); }
 
+        /* Report Grid */
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .report-card {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 24px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .report-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--gray-900);
+        }
+
+        .report-card h3 i {
+            color: var(--red-primary);
+            margin-right: 8px;
+        }
+
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .report-item:last-child {
+            border-bottom: none;
+        }
+
+        .report-item .label {
+            color: var(--gray-600);
+            font-size: 13px;
+        }
+
+        .report-item .value {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--gray-900);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--gray-200);
+            border-radius: var(--radius-full);
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            background: var(--red-gradient);
+            border-radius: var(--radius-full);
+        }
+
+        /* Chart Card */
+        .chart-card {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 24px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--gray-900);
+        }
+
+        .chart-card h3 i {
+            color: var(--red-primary);
+            margin-right: 8px;
+        }
+
+        .chart-bars {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 120px;
+        }
+
+        .chart-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .chart-bar .bar {
+            width: 30px;
+            background: var(--red-gradient);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+            transition: height 0.6s ease;
+        }
+
+        .chart-bar .bar-label {
+            font-size: 10px;
+            color: var(--gray-500);
+        }
+
+        .chart-bar .bar-value {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+
         /* Quick Actions */
         .quick-actions {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 24px;
         }
@@ -744,7 +867,8 @@ if ($search_term) {
 
         /* Responsive */
         @media (max-width: 1024px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .report-grid { grid-template-columns: 1fr; }
             .quick-actions { grid-template-columns: repeat(2, 1fr); }
         }
 
@@ -762,6 +886,7 @@ if ($search_term) {
             .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
             .quick-actions { grid-template-columns: 1fr; }
             .stat-card { padding: 16px 20px; }
+            .logo-link img { height: 32px; }
         }
 
         @media (max-width: 480px) {
@@ -769,6 +894,7 @@ if ($search_term) {
             .nav-search input { width: 80px; }
             .table-header { flex-direction: column; align-items: flex-start; }
             .content-footer { flex-direction: column; text-align: center; }
+            .logo-link img { height: 28px; }
         }
     </style>
 </head>
@@ -780,7 +906,7 @@ if ($search_term) {
                 <i class="fas fa-bars"></i>
             </button>
             <a href="dashboard.php" class="logo-link">
-                <img src="assets/images/cms-logo-red-white.png" alt="Client Management System" height="40">
+                <img src="assets/images/cms-logo-red-white.png" alt="Client Management System">
             </a>
         </div>
         <div class="nav-right">
@@ -827,6 +953,9 @@ if ($search_term) {
             </a>
             <a href="settings.php">
                 <i class="fas fa-cog"></i> Settings
+            </a>
+            <a href="payment/history.php" class="payment-link">
+                <i class="fas fa-credit-card"></i> Payments
             </a>
         </div>
     </aside>
@@ -883,6 +1012,18 @@ if ($search_term) {
                     <i class="fas fa-arrow-down"></i> 3%
                 </div>
             </div>
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <div class="stat-info">
+                    <h3><?= CURRENCY_SYMBOL ?> <?= number_format($paymentStats['total_amount'], 2) ?></h3>
+                    <p>Total Revenue</p>
+                </div>
+                <div class="stat-trend up">
+                    <i class="fas fa-arrow-up"></i> 0%
+                </div>
+            </div>
         </div>
 
         <!-- Quick Actions -->
@@ -890,12 +1031,63 @@ if ($search_term) {
             <a href="add_client.php" class="quick-action">
                 <i class="fas fa-user-plus"></i> Add New Client
             </a>
-            <a href="#" class="quick-action">
+            <a href="reports.php" class="quick-action">
                 <i class="fas fa-file-export"></i> Export Report
             </a>
-            <a href="#" class="quick-action">
+            <a href="renewals.php" class="quick-action">
                 <i class="fas fa-bell"></i> Renewal Alerts
             </a>
+            <a href="payment/history.php" class="quick-action">
+                <i class="fas fa-credit-card"></i> Manage Payments
+            </a>
+        </div>
+
+        <!-- Reports Grid -->
+        <div class="report-grid">
+            <!-- Policy Type Distribution -->
+            <div class="report-card">
+                <h3><i class="fas fa-chart-pie"></i> Policy Type Distribution</h3>
+                <?php foreach($policyTypes as $type): 
+                    $percentage = $totalClients > 0 ? round(($type['count'] / $totalClients) * 100) : 0;
+                ?>
+                    <div class="report-item">
+                        <span class="label"><?= htmlspecialchars($type['policy_type']) ?></span>
+                        <span class="value"><?= $type['count'] ?> (<?= $percentage ?>%)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="fill" style="width: <?= $percentage ?>%"></div>
+                    </div>
+                <?php endforeach; ?>
+                <?php if(empty($policyTypes)): ?>
+                    <p style="color: var(--gray-500); text-align: center; padding: 10px 0;">No data available</p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Client Growth Chart -->
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-line"></i> Client Growth</h3>
+                <div class="chart-bars">
+                    <?php 
+                    $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    $monthly_counts = [];
+                    foreach ($monthlyData as $data) {
+                        $monthly_counts[$data['month']] = $data['count'];
+                    }
+                    
+                    $max_count = max(array_values($monthly_counts)) ?: 1;
+                    
+                    foreach ($months as $month):
+                        $count = $monthly_counts[$month] ?? 0;
+                        $height = ($count / $max_count) * 100;
+                    ?>
+                        <div class="chart-bar">
+                            <div class="bar-value"><?= $count ?></div>
+                            <div class="bar" style="height: <?= $height ?>%;"></div>
+                            <div class="bar-label"><?= $month ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         </div>
 
         <!-- Client Table -->
@@ -903,7 +1095,7 @@ if ($search_term) {
             <div class="table-header">
                 <div>
                     <h2><i class="fas fa-list"></i> Client Records</h2>
-                    <p class="table-subtitle">Manage your insurance clients</p>
+                    <p class="table-subtitle">Manage your clients</p>
                 </div>
                 <span class="record-count">
                     <i class="fas fa-database"></i> <?= count($clients) ?> records
