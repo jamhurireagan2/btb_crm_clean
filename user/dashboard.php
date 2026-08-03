@@ -600,6 +600,18 @@ if (!$isExpired && $days <= 30):
         </div>
 
     </div>
+    <!-- Payment Quick Action -->
+<div class="quick-actions" style="margin-bottom: 20px;">
+    <a href="../payment/paypal.php" class="quick-action">
+        <i class="fab fa-paypal"></i> Pay with PayPal
+    </a>
+    <a href="../payment/mpesa.php" class="quick-action">
+        <i class="fas fa-mobile-alt"></i> Pay with M-Pesa
+    </a>
+    <a href="../payment/history.php" class="quick-action">
+        <i class="fas fa-history"></i> Payment History
+    </a>
+</div>
 
 </body>
 </html>

@@ -823,6 +823,23 @@ if ($search_term) {
                 <i class="fas fa-cog"></i> Settings
             </a>
         </div>
+
+        // Add payment stats to admin dashboard
+$paymentStats = getPaymentStats();
+?>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <i class="fas fa-credit-card"></i>
+        </div>
+        <div class="stat-info">
+            <h3><?= CURRENCY_SYMBOL ?> <?= number_format($paymentStats['total_amount'], 2) ?></h3>
+            <p>Total Revenue</p>
+        </div>
+        <div class="stat-trend up">
+            <i class="fas fa-arrow-up"></i> <?= $paymentStats['growth_percentage'] ?>%
+        </div>
     </aside>
 
     <!-- Main Content -->
