@@ -20,7 +20,7 @@ jobs:
         with:
           server: ftpupload.net
           username: if0_42536062
-          password: ${{ secrets.FTP_PASSWORD }}
+          password: ${{ secrets.FTP_PASSWORD }} # pragma: allowlist secret
           server-dir: /htdocs/
           timeout: 86400000
           log-level: standard
