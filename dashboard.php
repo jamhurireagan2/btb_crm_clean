@@ -957,9 +957,11 @@ $monthlyData = $pdo->query("SELECT DATE_FORMAT(created_at, '%b') as month, COUNT
             <a href="payment/history.php" class="payment-link">
                 <i class="fas fa-credit-card"></i> Payments
             </a>
+            
             <a href="admin/payment_settings.php">
     <i class="fas fa-credit-card"></i> Payment Settings
 </a>
+            
         </div>
     </aside>
 
