@@ -3,6 +3,11 @@ require_once 'config/database.php';
 require_once 'config/payment.php';
 require_once 'includes/payment_functions.php';
 
+// Make sure user_type is set
+if (!isset($_SESSION['user_type'])) {
+    $_SESSION['user_type'] = 'admin';
+}
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
