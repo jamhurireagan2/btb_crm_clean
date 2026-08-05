@@ -21,12 +21,15 @@ if (!$client) {
 }
 
 $policy_number = $client['policy_number'];
-$amount = 5000; // Example amount
+
+// Get dynamic price from settings
+$amount = getPolicyPrice($client['policy_type']);
+$currency = getCurrency();
+$currency_symbol = getCurrencySymbol();
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $payment_id = createPayment($client_id, $policy_number, $amount, 'paypal');
     
-    // Use the correct PayPal sandbox URL
     $paypal_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr';
     
     $paypal_data = [
@@ -35,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'item_name' => 'Policy Renewal - ' . $policy_number,
         'item_number' => $payment_id,
         'amount' => $amount,
-        'currency_code' => 'USD',
+        'currency_code' => $currency,
         'return' => SITE_URL . '/payment/success.php?payment_id=' . $payment_id,
         'cancel_return' => SITE_URL . '/payment/cancel.php?payment_id=' . $payment_id,
         'notify_url' => SITE_URL . '/payment/ipn.php'
@@ -137,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             <div class="row">
                 <span class="label">Amount</span>
-                <span class="value amount">$ <?= number_format($amount, 2) ?> USD</span>
+                <span class="value amount"><?= $currency_symbol ?> <?= number_format($amount, 2) ?></span>
             </div>
         </div>
 
