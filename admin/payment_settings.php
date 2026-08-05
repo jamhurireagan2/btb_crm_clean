@@ -1,14 +1,20 @@
 <?php
 session_start();
 
-// Check if user is logged in
+// Redirect if not logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// If user_type is not set, determine it from database
+// Set user_type if not set (for admin)
 if (!isset($_SESSION['user_type'])) {
+    $_SESSION['user_type'] = 'admin';
+}
+
+// Check if user is admin (if username is 'admin')
+if ($_SESSION['user_type'] !== 'admin') {
+    // Try to check from database
     require_once '../config/database.php';
     $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
@@ -17,14 +23,9 @@ if (!isset($_SESSION['user_type'])) {
     if ($user && $user['username'] === 'admin') {
         $_SESSION['user_type'] = 'admin';
     } else {
-        $_SESSION['user_type'] = 'client';
+        header('Location: ../login.php');
+        exit;
     }
-}
-
-// Now check if user is admin
-if ($_SESSION['user_type'] !== 'admin') {
-    header('Location: ../login.php');
-    exit;
 }
 
 require_once '../config/database.php';
