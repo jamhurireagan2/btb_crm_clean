@@ -7,9 +7,8 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// If user_type is not set, determine it from username
+// If user_type is not set, determine it from database
 if (!isset($_SESSION['user_type'])) {
-    // Check if this is an admin (username is 'admin')
     require_once '../config/database.php';
     $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
@@ -28,6 +27,9 @@ if ($_SESSION['user_type'] !== 'admin') {
     exit;
 }
 
+require_once '../config/database.php';
+require_once '../includes/payment_functions.php';
+
 $message = '';
 $error = '';
 
@@ -45,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
-    // Update currency settings
     if (isset($_POST['currency_symbol'])) {
         updatePaymentSetting('currency_symbol', trim($_POST['currency_symbol']));
     }
@@ -60,7 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get current settings
 $policy_prices = getAllPolicyPrices();
 $currency_symbol = getCurrencySymbol();
 $currency = getCurrency();
@@ -224,7 +224,6 @@ $currency = getCurrency();
         <?php endif; ?>
 
         <form method="POST">
-            <!-- Policy Prices -->
             <div class="settings-group">
                 <h2><i class="fas fa-tag"></i> Policy Prices</h2>
                 <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Set the price for each policy type.</p>
@@ -257,7 +256,6 @@ $currency = getCurrency();
                 </div>
             </div>
 
-            <!-- Currency Settings -->
             <div class="settings-group">
                 <h2><i class="fas fa-dollar-sign"></i> Currency Settings</h2>
                 
