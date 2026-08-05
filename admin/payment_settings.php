@@ -1,10 +1,29 @@
 <?php
 session_start();
-require_once '../config/database.php';
-require_once '../includes/payment_functions.php';
 
-// Check if admin is logged in
-if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
+// If user_type is not set, determine it from username
+if (!isset($_SESSION['user_type'])) {
+    // Check if this is an admin (username is 'admin')
+    require_once '../config/database.php';
+    $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch();
+    
+    if ($user && $user['username'] === 'admin') {
+        $_SESSION['user_type'] = 'admin';
+    } else {
+        $_SESSION['user_type'] = 'client';
+    }
+}
+
+// Now check if user is admin
+if ($_SESSION['user_type'] !== 'admin') {
     header('Location: ../login.php');
     exit;
 }
