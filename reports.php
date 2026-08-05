@@ -711,6 +711,10 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             <a href="settings.php">
                 <i class="fas fa-cog"></i> Settings
             </a>
+
+            <a href="admin/payment_settings.php">
+    <i class="fas fa-credit-card"></i> Payment Settings
+</a>
         </div>
     </aside>
 

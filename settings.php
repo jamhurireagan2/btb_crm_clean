@@ -648,6 +648,10 @@ if (isset($_GET['export']) && $_GET['export'] == 'clients') {
             <a href="settings.php" class="active">
                 <i class="fas fa-cog"></i> Settings
             </a>
+
+            <a href="admin/payment_settings.php">
+    <i class="fas fa-credit-card"></i> Payment Settings
+</a>
         </div>
     </aside>
 

@@ -682,6 +682,10 @@ foreach ($clients as $client) {
             <a href="settings.php">
                 <i class="fas fa-cog"></i> Settings
             </a>
+
+            <a href="admin/payment_settings.php">
+    <i class="fas fa-credit-card"></i> Payment Settings
+</a>
         </div>
     </aside>
 
