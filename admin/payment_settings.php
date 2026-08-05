@@ -1,20 +1,14 @@
 <?php
 session_start();
 
-// Redirect if not logged in
+// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// Set user_type if not set (for admin)
+// If user_type is not set, determine it from database
 if (!isset($_SESSION['user_type'])) {
-    $_SESSION['user_type'] = 'admin';
-}
-
-// Check if user is admin (if username is 'admin')
-if ($_SESSION['user_type'] !== 'admin') {
-    // Try to check from database
     require_once '../config/database.php';
     $stmt = $pdo->prepare("SELECT username FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
@@ -23,9 +17,14 @@ if ($_SESSION['user_type'] !== 'admin') {
     if ($user && $user['username'] === 'admin') {
         $_SESSION['user_type'] = 'admin';
     } else {
-        header('Location: ../login.php');
-        exit;
+        $_SESSION['user_type'] = 'client';
     }
+}
+
+// Now check if user is admin
+if ($_SESSION['user_type'] !== 'admin') {
+    header('Location: ../login.php');
+    exit;
 }
 
 require_once '../config/database.php';
@@ -36,6 +35,7 @@ $error = '';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Policy Prices
     $policy_types = ['Motor', 'Life', 'Health', 'Property', 'Travel', 'Business'];
     $all_success = true;
     
@@ -48,11 +48,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
+    // Currency Settings
     if (isset($_POST['currency_symbol'])) {
         updatePaymentSetting('currency_symbol', trim($_POST['currency_symbol']));
     }
     if (isset($_POST['currency'])) {
         updatePaymentSetting('currency', trim($_POST['currency']));
+    }
+    
+    // M-Pesa Settings
+    if (isset($_POST['mpesa_consumer_key'])) {
+        updatePaymentSetting('mpesa_consumer_key', trim($_POST['mpesa_consumer_key']));
+    }
+    if (isset($_POST['mpesa_consumer_secret'])) {
+        updatePaymentSetting('mpesa_consumer_secret', trim($_POST['mpesa_consumer_secret']));
+    }
+    if (isset($_POST['mpesa_passkey'])) {
+        updatePaymentSetting('mpesa_passkey', trim($_POST['mpesa_passkey']));
+    }
+    if (isset($_POST['mpesa_shortcode'])) {
+        updatePaymentSetting('mpesa_shortcode', trim($_POST['mpesa_shortcode']));
+    }
+    if (isset($_POST['mpesa_environment'])) {
+        updatePaymentSetting('mpesa_environment', trim($_POST['mpesa_environment']));
     }
     
     if ($all_success) {
@@ -62,9 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// Get current settings
 $policy_prices = getAllPolicyPrices();
 $currency_symbol = getCurrencySymbol();
 $currency = getCurrency();
+
+// Get M-Pesa settings
+$mpesa_consumer_key = getPaymentSetting('mpesa_consumer_key');
+$mpesa_consumer_secret = getPaymentSetting('mpesa_consumer_secret');
+$mpesa_passkey = getPaymentSetting('mpesa_passkey');
+$mpesa_shortcode = getPaymentSetting('mpesa_shortcode') ?: '174379';
+$mpesa_environment = getPaymentSetting('mpesa_environment') ?: 'sandbox';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -162,7 +188,7 @@ $currency = getCurrency();
             color: #334155;
             margin-bottom: 4px;
         }
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 10px 14px;
             border: 2px solid #e2e8f0;
@@ -171,7 +197,7 @@ $currency = getCurrency();
             font-family: 'Inter', sans-serif;
             transition: all 0.3s ease;
         }
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #dc2626;
             box-shadow: 0 0 0 4px rgba(220,38,38,0.1);
@@ -225,6 +251,7 @@ $currency = getCurrency();
         <?php endif; ?>
 
         <form method="POST">
+            <!-- Policy Prices -->
             <div class="settings-group">
                 <h2><i class="fas fa-tag"></i> Policy Prices</h2>
                 <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Set the price for each policy type.</p>
@@ -257,6 +284,7 @@ $currency = getCurrency();
                 </div>
             </div>
 
+            <!-- Currency Settings -->
             <div class="settings-group">
                 <h2><i class="fas fa-dollar-sign"></i> Currency Settings</h2>
                 
@@ -270,6 +298,43 @@ $currency = getCurrency();
                         <label>Currency Code</label>
                         <input type="text" name="currency" value="<?= htmlspecialchars($currency) ?>" placeholder="e.g., KES, USD, EUR">
                         <div class="hint">Example: KES, USD, EUR</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- M-Pesa Settings -->
+            <div class="settings-group">
+                <h2><i class="fas fa-mobile-alt"></i> M-Pesa Settings</h2>
+                <p style="color:#64748b;font-size:14px;margin-bottom:16px;">Enter your M-Pesa API credentials from Safaricom Developer Portal.</p>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Consumer Key</label>
+                        <input type="text" name="mpesa_consumer_key" value="<?= htmlspecialchars($mpesa_consumer_key) ?>" placeholder="Enter Consumer Key">
+                        <div class="hint">From Safaricom Developer Portal</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Consumer Secret</label>
+                        <input type="text" name="mpesa_consumer_secret" value="<?= htmlspecialchars($mpesa_consumer_secret) ?>" placeholder="Enter Consumer Secret">
+                        <div class="hint">From Safaricom Developer Portal</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Passkey</label>
+                        <input type="text" name="mpesa_passkey" value="<?= htmlspecialchars($mpesa_passkey) ?>" placeholder="Enter Passkey">
+                        <div class="hint">From Safaricom Developer Portal</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Shortcode</label>
+                        <input type="text" name="mpesa_shortcode" value="<?= htmlspecialchars($mpesa_shortcode) ?>" placeholder="e.g., 174379">
+                        <div class="hint">Paybill number (174379 for sandbox)</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Environment</label>
+                        <select name="mpesa_environment">
+                            <option value="sandbox" <?= $mpesa_environment == 'sandbox' ? 'selected' : '' ?>>Sandbox (Testing)</option>
+                            <option value="live" <?= $mpesa_environment == 'live' ? 'selected' : '' ?>>Live (Production)</option>
+                        </select>
+                        <div class="hint">Select 'Sandbox' for testing, 'Live' for production</div>
                     </div>
                 </div>
             </div>
