@@ -2,8 +2,8 @@
 // Payment Configuration
 
 // Currency
-define('CURRENCY', 'KES');
-define('CURRENCY_SYMBOL', 'KSh');
+define('CURRENCY', 'USD');
+define('CURRENCY_SYMBOL', '$');
 
 // PayPal Settings
 define('PAYPAL_ENABLED', true);
