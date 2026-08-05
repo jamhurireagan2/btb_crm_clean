@@ -10,7 +10,7 @@ define('PAYPAL_ENABLED', true);
 define('PAYPAL_MODE', 'sandbox');
 define('PAYPAL_CLIENT_ID', '');
 define('PAYPAL_SECRET', '');
-define('PAYPAL_BUSINESS_EMAIL', 'sb-jni8w52264421@business.example.com'); // ← YOUR BUSINESS EMAIL
+define('PAYPAL_BUSINESS_EMAIL', 'reaganmadola2@gmail.com'); // ← YOUR BUSINESS EMAIL
 
 // M-Pesa Settings (disabled for now)
 define('MPESA_ENABLED', false);
