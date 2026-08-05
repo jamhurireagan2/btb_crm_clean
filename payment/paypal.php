@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'client') {
 }
 
 $client_id = $_SESSION['user_id'];
-$error = '';
 
 $stmt = $pdo->prepare("SELECT * FROM clients WHERE id = ?");
 $stmt->execute([$client_id]);
@@ -22,14 +21,13 @@ if (!$client) {
 }
 
 $policy_number = $client['policy_number'];
-$amount = 5000; // Example amount - you can make this dynamic
+$amount = 5000; // Example amount
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $payment_id = createPayment($client_id, $policy_number, $amount, 'paypal');
     
-    $paypal_url = PAYPAL_MODE == 'live' 
-        ? 'https://www.paypal.com/cgi-bin/webscr' 
-        : 'https://www.sandbox.paypal.com/cgi-bin/webscr';
+    // Use the correct PayPal sandbox URL
+    $paypal_url = 'https://www.sandbox.paypal.com/cgi-bin/webscr';
     
     $paypal_data = [
         'cmd' => '_xclick',
@@ -37,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'item_name' => 'Policy Renewal - ' . $policy_number,
         'item_number' => $payment_id,
         'amount' => $amount,
-        'currency_code' => CURRENCY,
+        'currency_code' => 'USD',
         'return' => SITE_URL . '/payment/success.php?payment_id=' . $payment_id,
         'cancel_return' => SITE_URL . '/payment/cancel.php?payment_id=' . $payment_id,
         'notify_url' => SITE_URL . '/payment/ipn.php'
@@ -139,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             <div class="row">
                 <span class="label">Amount</span>
-                <span class="value amount"><?= CURRENCY_SYMBOL ?> <?= number_format($amount, 2) ?></span>
+                <span class="value amount">$ <?= number_format($amount, 2) ?> USD</span>
             </div>
         </div>
 
@@ -150,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
 
         <div class="secure-badge">
-            <i class="fas fa-lock"></i> Secure payment powered by PayPal
+            <i class="fas fa-lock"></i> Secure payment powered by PayPal Sandbox
         </div>
         <div style="text-align: center;">
             <a href="../user/dashboard.php" class="back-link">
