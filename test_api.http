@@ -1,0 +1,7 @@
+POST https://client-managent-ystem.page.gd/mobile_api/login.php
+Content-Type: application/json
+
+{
+    "policy_number": "POL-001",
+    "password": "client123"
+}
