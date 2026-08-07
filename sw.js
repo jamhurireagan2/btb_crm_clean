@@ -1,13 +1,15 @@
 // Service Worker for Client Management System PWA
 
-const CACHE_NAME = 'cms-v1';
+const CACHE_NAME = 'cms-v2';
 const urlsToCache = [
   '/',
-  '/index.php',
-  '/login.php',
-  '/dashboard.php',
+  '/index_pwa.php',
+  '/pwa_login.php',
+  '/pwa_dashboard.php',
+  '/pwa_logout.php',
   '/assets/style.css',
-  '/assets/images/cms-logo-red-white.png'
+  '/assets/images/icon-192x192.png',
+  '/assets/images/icon-512x512.png'
 ];
 
 // Install event - cache assets
