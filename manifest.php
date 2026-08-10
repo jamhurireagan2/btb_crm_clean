@@ -1,0 +1,44 @@
+<?php
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json');
+
+$manifest = [
+    'name' => 'Client Management System',
+    'short_name' => 'CMS',
+    'description' => 'Manage your insurance clients and policies on the go',
+    'start_url' => '/index_pwa.php',
+    'display' => 'standalone',
+    'orientation' => 'portrait',
+    'theme_color' => '#dc2626',
+    'background_color' => '#ffffff',
+    'icons' => [
+        [
+            'src' => 'assets/images/launchericon-72x72.png',
+            'sizes' => '72x72',
+            'type' => 'image/png'
+        ],
+        [
+            'src' => 'assets/images/launchericon-96x96.png',
+            'sizes' => '96x96',
+            'type' => 'image/png'
+        ],
+        [
+            'src' => 'assets/images/launchericon-144x144.png',
+            'sizes' => '144x144',
+            'type' => 'image/png'
+        ],
+        [
+            'src' => 'assets/images/launchericon-192x192.png',
+            'sizes' => '192x192',
+            'type' => 'image/png'
+        ],
+        [
+            'src' => 'assets/images/launchericon-512x512.png',
+            'sizes' => '512x512',
+            'type' => 'image/png'
+        ]
+    ]
+];
+
+echo json_encode($manifest);
+?>
