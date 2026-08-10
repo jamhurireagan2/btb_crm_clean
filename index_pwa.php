@@ -13,7 +13,7 @@ if (isset($_SESSION['user_id'])) {
     <title>Client Management System</title>
     
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.php">
     <meta name="theme-color" content="#dc2626">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
