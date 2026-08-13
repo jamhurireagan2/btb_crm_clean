@@ -1100,6 +1100,32 @@ $monthlyData = $pdo->query("SELECT DATE_FORMAT(created_at, '%b') as month, COUNT
             </div>
         </div>
 
+        <!-- Export Section -->
+<div class="export-section" style="background:white;padding:20px;border-radius:12px;margin-bottom:24px;border:1px solid #e2e8f0;">
+    <h3 style="margin-bottom:12px;"><i class="fas fa-file-export" style="color:#dc2626;"></i> Export Data</h3>
+    <form method="GET" action="export_excel.php" target="_blank" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;font-weight:600;color:#64748b;">Start Date</label>
+            <input type="date" name="start_date" value="<?= date('Y-m-d', strtotime('-30 days')) ?>" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;font-weight:600;color:#64748b;">End Date</label>
+            <input type="date" name="end_date" value="<?= date('Y-m-d') ?>" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+            <label style="font-size:12px;font-weight:600;color:#64748b;">Export Type</label>
+            <select name="export_type" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;">
+                <option value="clients">Clients</option>
+                <option value="payments">Payments</option>
+                <option value="reports">Reports</option>
+            </select>
+        </div>
+        <button type="submit" style="margin-top:18px;padding:8px 24px;background:#dc2626;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <i class="fas fa-download"></i> Export Excel
+        </button>
+    </form>
+</div>
+
         <!-- Client Table -->
         <div class="table-container">
             <div class="table-header">
