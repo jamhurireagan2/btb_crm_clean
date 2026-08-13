@@ -1,38 +1,115 @@
 <?php
 require_once 'config/database.php';
+require_once 'config/payment.php';
+require_once 'includes/payment_functions.php';
 
-if (!isset($_SESSION['user_id'])) {
+// Check if admin is logged in
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
     header('Location: login.php');
     exit;
 }
 
-// Get statistics for reports
-$totalClients = $pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-$totalPolicies = $pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
-$expired = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date < CURDATE()")->fetchColumn();
-$expiringSoon = $pdo->query("SELECT COUNT(*) FROM clients WHERE expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND expiry_date >= CURDATE()")->fetchColumn();
-$activePolicies = $totalClients - $expired;
+// Get filters
+$start_date = $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
+$end_date = $_GET['end_date'] ?? date('Y-m-d');
+$report_type = $_GET['report_type'] ?? 'clients';
+$search = $_GET['search'] ?? '';
 
-// Get policy type distribution
-$policyTypes = $pdo->query("SELECT policy_type, COUNT(*) as count FROM clients GROUP BY policy_type")->fetchAll();
+// Build query based on report type
+$data = [];
+$total_records = 0;
 
-// Get monthly data for chart
-$monthlyData = $pdo->query("SELECT DATE_FORMAT(created_at, '%M') as month, COUNT(*) as count FROM clients WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY month ORDER BY created_at ASC")->fetchAll();
+if ($report_type == 'clients') {
+    $sql = "SELECT * FROM clients WHERE 1=1";
+    $params = [];
+    
+    if ($start_date && $end_date) {
+        $sql .= " AND created_at BETWEEN ? AND ?";
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
+    if ($search) {
+        $sql .= " AND (full_name LIKE ? OR phone LIKE ? OR policy_number LIKE ? OR email LIKE ?)";
+        $search_param = "%$search%";
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
+    }
+    
+    $sql .= " ORDER BY created_at DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll();
+    $total_records = count($data);
+    
+} elseif ($report_type == 'payments') {
+    $sql = "SELECT p.*, c.full_name as client_name, c.policy_number 
+            FROM payments p 
+            JOIN clients c ON p.client_id = c.id 
+            WHERE 1=1";
+    $params = [];
+    
+    if ($start_date && $end_date) {
+        $sql .= " AND p.created_at BETWEEN ? AND ?";
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
+    if ($search) {
+        $sql .= " AND (c.full_name LIKE ? OR c.policy_number LIKE ? OR p.transaction_id LIKE ?)";
+        $search_param = "%$search%";
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
+    }
+    
+    $sql .= " ORDER BY p.created_at DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll();
+    $total_records = count($data);
+    
+} else { // reports
+    $sql = "SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as total_clients,
+                SUM(CASE WHEN expiry_date < CURDATE() THEN 1 ELSE 0 END) as expired,
+                SUM(CASE WHEN expiry_date >= CURDATE() THEN 1 ELSE 0 END) as active
+            FROM clients 
+            WHERE 1=1";
+    $params = [];
+    
+    if ($start_date && $end_date) {
+        $sql .= " AND created_at BETWEEN ? AND ?";
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
+    $sql .= " GROUP BY DATE(created_at) ORDER BY date DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll();
+    $total_records = count($data);
+}
 
-// Get recent activity
-$recentActivity = $pdo->query("SELECT full_name, created_at, 'added' as action FROM clients ORDER BY created_at DESC LIMIT 5")->fetchAll();
-$recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE expiry_date >= CURDATE() ORDER BY expiry_date ASC LIMIT 5")->fetchAll();
+// Get summary stats
+$total_clients = $pdo->query("SELECT COUNT(*) FROM clients")->fetchColumn();
+$total_payments = $pdo->query("SELECT COUNT(*) FROM payments WHERE status = 'completed'")->fetchColumn();
+$total_revenue = $pdo->query("SELECT SUM(amount) FROM payments WHERE status = 'completed'")->fetchColumn() ?: 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports - BTB Insurance</title>
+    <title>Reports - Client Management System</title>
+    <link rel="stylesheet" href="assets/style.css?v=<?= time() ?>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Same base styles as dashboard.php - Copy from dashboard inline CSS */
+        /* Same styles as dashboard.php - keeping it consistent */
         :root {
             --red-primary: #dc2626;
             --red-dark: #b91c1c;
@@ -71,7 +148,6 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             line-height: 1.6;
         }
 
-        /* Dark Mode */
         body.dark-mode {
             --gray-50: #0f172a;
             --gray-100: #1e293b;
@@ -89,8 +165,7 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
         body.dark-mode .sidebar,
         body.dark-mode .stat-card,
         body.dark-mode .table-container,
-        body.dark-mode .report-card,
-        body.dark-mode .chart-container {
+        body.dark-mode .filter-card {
             background: var(--bg-card);
             border-color: var(--border-color);
         }
@@ -100,8 +175,8 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
         body.dark-mode .stat-info h3,
         body.dark-mode .table-header h2,
         body.dark-mode .client-name,
-        body.dark-mode .report-card h3,
-        body.dark-mode .chart-container h3 {
+        body.dark-mode .contact-info,
+        body.dark-mode .filter-card label {
             color: var(--text-primary);
         }
 
@@ -110,16 +185,30 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
         body.dark-mode .table-subtitle,
         body.dark-mode .record-count,
         body.dark-mode .client-email,
-        body.dark-mode .content-footer,
-        body.dark-mode .report-card p {
+        body.dark-mode .content-footer {
             color: var(--text-secondary);
+        }
+
+        body.dark-mode .filter-card input,
+        body.dark-mode .filter-card select {
+            background: var(--gray-50);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        body.dark-mode tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        body.dark-mode thead {
+            background: var(--gray-50);
         }
 
         body.dark-mode .content-footer {
             border-color: var(--border-color);
         }
 
-        /* Top Navigation - Same as dashboard */
+        /* Top Navigation - same as dashboard */
         .top-nav {
             position: fixed;
             top: 0;
@@ -154,28 +243,16 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
 
         .mobile-toggle:hover { background: var(--gray-100); }
 
-        .nav-brand {
+        .logo-link {
             display: flex;
             align-items: center;
-            gap: 10px;
+            text-decoration: none;
         }
 
-        .nav-brand .brand-icon {
-            width: 36px;
-            height: 36px;
-            background: var(--red-gradient);
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 16px;
-        }
-
-        .nav-brand span {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--gray-900);
+        .logo-link img {
+            height: 40px;
+            width: auto;
+            object-fit: contain;
         }
 
         .nav-right {
@@ -183,6 +260,54 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             align-items: center;
             gap: 16px;
         }
+
+        .nav-search form {
+            display: flex;
+            align-items: center;
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-full);
+            padding: 0 4px 0 14px;
+            transition: var(--transition);
+        }
+
+        .nav-search form:focus-within {
+            border-color: var(--red-primary);
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
+        }
+
+        .nav-search i {
+            color: var(--gray-400);
+            font-size: 14px;
+        }
+
+        .nav-search input {
+            border: none;
+            background: transparent;
+            padding: 7px 10px;
+            font-size: 14px;
+            width: 180px;
+            outline: none;
+            color: var(--gray-900);
+        }
+
+        .nav-search .clear-search {
+            color: var(--gray-400);
+            padding: 4px 6px;
+            text-decoration: none;
+        }
+
+        .search-btn {
+            background: var(--red-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--radius-full);
+            padding: 5px 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .search-btn:hover { transform: scale(1.05); }
 
         .nav-user {
             display: flex;
@@ -295,8 +420,6 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             justify-content: space-between;
             align-items: center;
             margin-bottom: 24px;
-            flex-wrap: wrap;
-            gap: 16px;
         }
 
         .page-header h1 {
@@ -312,33 +435,12 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
         .page-subtitle {
             color: var(--gray-500);
             font-size: 15px;
-            margin-top: 4px;
         }
 
-        .btn-secondary {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background: transparent;
-            color: var(--gray-700);
-            border: 2px solid var(--gray-200);
-            border-radius: var(--radius-sm);
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: var(--transition);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--red-primary);
-            color: var(--red-primary);
-        }
-
-        /* Stats Grid */
+        /* Stats Cards */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -348,250 +450,259 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             padding: 20px 24px;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            transition: var(--transition);
             border-left: 4px solid var(--red-primary);
-            position: relative;
         }
 
-        .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: var(--radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            flex-shrink: 0;
-        }
-
-        .stat-icon.red { background: var(--red-light); color: var(--red-primary); }
-        .stat-icon.green { background: var(--success-light); color: var(--success); }
-        .stat-icon.yellow { background: var(--warning-light); color: var(--warning); }
-        .stat-icon.red-dark { background: #fecaca; color: var(--red-dark); }
-        .stat-icon.blue { background: #dbeafe; color: #2563eb; }
-
-        .stat-info h3 {
+        .stat-card h3 {
             font-size: 28px;
             font-weight: 700;
-            line-height: 1.2;
             color: var(--gray-900);
         }
 
-        .stat-info p {
+        .stat-card p {
             color: var(--gray-500);
             font-size: 13px;
-            font-weight: 500;
         }
 
-        .stat-trend {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 2px 10px;
-            border-radius: var(--radius-full);
+        .stat-card .stat-icon {
+            display: inline-block;
+            margin-right: 8px;
         }
 
-        .stat-trend.up { color: var(--success); background: var(--success-light); }
-        .stat-trend.down { color: var(--red-primary); background: var(--red-light); }
-
-        /* Report Cards */
-        .report-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 24px;
-            margin-bottom: 24px;
-        }
-
-        .report-card {
+        /* Filter Card */
+        .filter-card {
             background: white;
+            padding: 20px 24px;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
-            padding: 24px;
+            margin-bottom: 24px;
             border: 1px solid var(--gray-200);
-            transition: var(--transition);
         }
 
-        .report-card:hover {
-            box-shadow: var(--shadow-lg);
-        }
-
-        .report-card h3 {
+        .filter-card h3 {
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 16px;
             color: var(--gray-900);
+        }
+
+        .filter-card h3 i {
+            color: var(--red-primary);
+            margin-right: 8px;
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 8px 14px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            transition: var(--transition);
+            min-width: 150px;
+        }
+
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--red-primary);
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.1);
+        }
+
+        .filter-group .search-input {
+            min-width: 250px;
+        }
+
+        .btn-filter {
+            padding: 8px 24px;
+            background: var(--red-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Inter', sans-serif;
+            height: 42px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .report-card h3 i {
-            color: var(--red-primary);
+        .btn-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-red);
         }
 
-        .report-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--gray-100);
-        }
-
-        .report-item:last-child {
-            border-bottom: none;
-        }
-
-        .report-item .label {
-            color: var(--gray-600);
+        .btn-export {
+            padding: 8px 24px;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
             font-size: 14px;
-        }
-
-        .report-item .value {
             font-weight: 600;
-            font-size: 14px;
-            color: var(--gray-900);
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Inter', sans-serif;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 8px;
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-reset {
+            padding: 8px 24px;
             background: var(--gray-200);
-            border-radius: var(--radius-full);
-            margin-top: 8px;
+            color: var(--gray-700);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Inter', sans-serif;
+            height: 42px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-reset:hover {
+            background: var(--gray-300);
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             overflow: hidden;
         }
 
-        .progress-bar .fill {
-            height: 100%;
-            background: var(--red-gradient);
-            border-radius: var(--radius-full);
-            transition: width 0.6s ease;
-        }
-
-        /* Chart Container */
-        .chart-container {
-            background: white;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 24px;
-            border: 1px solid var(--gray-200);
-            margin-bottom: 24px;
-        }
-
-        .chart-container h3 {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: var(--gray-900);
+        .table-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--gray-200);
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
-        .chart-container h3 i {
+        .table-header h2 {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .table-header h2 i {
+            margin-right: 8px;
             color: var(--red-primary);
         }
 
-        .chart-bars {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-around;
-            height: 200px;
-            padding-top: 20px;
-        }
-
-        .chart-bar {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            flex: 1;
-        }
-
-        .chart-bar .bar {
-            width: 40px;
-            background: var(--red-gradient);
-            border-radius: 4px 4px 0 0;
-            transition: height 0.6s ease;
-            min-height: 10px;
-        }
-
-        .chart-bar .bar-label {
-            font-size: 11px;
+        .record-count {
+            font-size: 13px;
             color: var(--gray-500);
-            text-align: center;
+            background: var(--gray-50);
+            padding: 4px 14px;
+            border-radius: var(--radius-full);
         }
 
-        .chart-bar .bar-value {
-            font-size: 12px;
+        .table-responsive { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--gray-50);
+        }
+
+        thead th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--gray-500);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        tbody tr { transition: var(--transition); }
+        tbody tr:hover { background: var(--gray-50); }
+
+        tbody td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 14px;
             color: var(--gray-700);
         }
 
-        /* Activity List */
-        .activity-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            background: var(--gray-50);
-            border-radius: var(--radius-sm);
-        }
-
-        .activity-item .activity-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-
-        .activity-item .activity-icon.added {
-            background: var(--success-light);
-            color: var(--success);
-        }
-
-        .activity-item .activity-icon.expiring {
-            background: var(--warning-light);
-            color: var(--warning);
-        }
-
-        .activity-item .activity-text {
-            flex: 1;
-        }
-
-        .activity-item .activity-text .name {
+        .badge-status {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
             font-weight: 600;
-            font-size: 14px;
-            color: var(--gray-900);
         }
 
-        .activity-item .activity-text .action {
-            font-size: 13px;
+        .badge-status.completed { background: var(--success-light); color: var(--success); }
+        .badge-status.pending { background: var(--warning-light); color: var(--warning); }
+        .badge-status.failed { background: #fee2e2; color: var(--red-primary); }
+        .badge-status.active { background: var(--success-light); color: var(--success); }
+        .badge-status.expired { background: #fee2e2; color: var(--red-primary); }
+        .badge-status.expiring { background: var(--warning-light); color: var(--warning); }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
             color: var(--gray-500);
         }
 
-        .activity-item .activity-time {
-            font-size: 12px;
-            color: var(--gray-400);
+        .empty-state i {
+            font-size: 48px;
+            color: var(--gray-300);
+            margin-bottom: 12px;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            color: var(--gray-700);
+            margin-bottom: 6px;
         }
 
         .content-footer {
@@ -610,7 +721,9 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
         /* Responsive */
         @media (max-width: 1024px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .report-grid { grid-template-columns: 1fr; }
+            .filter-row { flex-direction: column; align-items: stretch; }
+            .filter-group input, .filter-group select { width: 100%; }
+            .filter-group .search-input { min-width: auto; }
         }
 
         @media (max-width: 768px) {
@@ -622,44 +735,18 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             .sidebar.show { transform: translateX(0); }
             .main-content { margin-left: 0; padding: 16px; }
             .top-nav { padding: 0 16px; }
+            .nav-search input { width: 120px; }
             .user-greeting { display: none; }
             .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-            .page-header { flex-direction: column; align-items: flex-start; }
-            .chart-bars { height: 150px; }
-            .chart-bar .bar { width: 30px; }
+            .logo-link img { height: 32px; }
         }
 
         @media (max-width: 480px) {
             .stats-grid { grid-template-columns: 1fr; }
+            .nav-search input { width: 80px; }
+            .table-header { flex-direction: column; align-items: flex-start; }
             .content-footer { flex-direction: column; text-align: center; }
-            .report-card { padding: 16px; }
-        }
-
-        .btn-export {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: var(--red-gradient);
-            color: white;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: var(--transition);
-        }
-
-        .btn-export:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-red);
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            .logo-link img { height: 28px; }
         }
     </style>
 </head>
@@ -670,14 +757,22 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             <button class="mobile-toggle" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
-            <div class="nav-brand">
-                <div class="brand-icon">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <span>Client Management System</span>
-            </div>
+            <a href="dashboard.php" class="logo-link">
+                <img src="assets/images/cms-logo-red-white.png" alt="Client Management System">
+            </a>
         </div>
         <div class="nav-right">
+            <div class="nav-search">
+                <form method="GET">
+                    <i class="fas fa-search"></i>
+                    <input type="text" name="search" placeholder="Search clients..." 
+                           value="<?= htmlspecialchars($search) ?>">
+                    <?php if($search): ?>
+                        <a href="reports.php" class="clear-search"><i class="fas fa-times"></i></a>
+                    <?php endif; ?>
+                    <button type="submit" class="search-btn"><i class="fas fa-arrow-right"></i></button>
+                </form>
+            </div>
             <div class="nav-user">
                 <span class="user-greeting">Hi, <?= htmlspecialchars($_SESSION['username'] ?? 'Admin') ?></span>
                 <div class="user-avatar">
@@ -711,153 +806,174 @@ $recentExpiry = $pdo->query("SELECT full_name, expiry_date FROM clients WHERE ex
             <a href="settings.php">
                 <i class="fas fa-cog"></i> Settings
             </a>
-
+            <a href="payment/history.php">
+                <i class="fas fa-credit-card"></i> Payments
+            </a>
             <a href="admin/payment_settings.php">
-    <i class="fas fa-credit-card"></i> Payment Settings
-</a>
+                <i class="fas fa-credit-card"></i> Payment Settings
+            </a>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content" id="mainContent">
+        <!-- Page Header -->
         <div class="page-header">
             <div>
                 <h1><i class="fas fa-file-alt"></i> Reports</h1>
-                <p class="page-subtitle">View analytics and insights about your clients</p>
-            </div>
-            <div class="action-bar">
-                <button class="btn-export" onclick="window.print()">
-                    <i class="fas fa-download"></i> Export PDF
-                </button>
-                <a href="dashboard.php" class="btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Back
-                </a>
+                <p class="page-subtitle">View and export your data with advanced filtering</p>
             </div>
         </div>
 
         <!-- Stats Cards -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon red">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?= number_format($totalClients) ?></h3>
-                    <p>Total Clients</p>
-                </div>
+                <h3><?= number_format($total_clients) ?></h3>
+                <p><i class="fas fa-users stat-icon"></i> Total Clients</p>
             </div>
             <div class="stat-card">
-                <div class="stat-icon green">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?= number_format($activePolicies) ?></h3>
-                    <p>Active Policies</p>
-                </div>
+                <h3><?= number_format($total_payments) ?></h3>
+                <p><i class="fas fa-credit-card stat-icon"></i> Total Payments</p>
             </div>
             <div class="stat-card">
-                <div class="stat-icon yellow">
-                    <i class="fas fa-clock"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?= number_format($expiringSoon) ?></h3>
-                    <p>Expiring Soon</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon blue">
-                    <i class="fas fa-percentage"></i>
-                </div>
-                <div class="stat-info">
-                    <h3><?= $totalClients > 0 ? round(($activePolicies / $totalClients) * 100) : 0 ?>%</h3>
-                    <p>Retention Rate</p>
-                </div>
+                <h3><?= CURRENCY_SYMBOL ?> <?= number_format($total_revenue, 2) ?></h3>
+                <p><i class="fas fa-chart-line stat-icon"></i> Total Revenue</p>
             </div>
         </div>
 
-        <!-- Report Grid -->
-        <div class="report-grid">
-            <!-- Policy Type Distribution -->
-            <div class="report-card">
-                <h3><i class="fas fa-chart-pie"></i> Policy Type Distribution</h3>
-                <?php foreach($policyTypes as $type): 
-                    $percentage = $totalClients > 0 ? round(($type['count'] / $totalClients) * 100) : 0;
-                ?>
-                    <div class="report-item">
-                        <span class="label"><?= htmlspecialchars($type['policy_type']) ?></span>
-                        <span class="value"><?= $type['count'] ?> (<?= $percentage ?>%)</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="fill" style="width: <?= $percentage ?>%"></div>
-                    </div>
-                <?php endforeach; ?>
-                <?php if(empty($policyTypes)): ?>
-                    <p style="color: var(--gray-500); text-align: center; padding: 20px 0;">No data available</p>
-                <?php endif; ?>
-            </div>
-
-            <!-- Client Growth -->
-            <div class="report-card">
-                <h3><i class="fas fa-chart-line"></i> Client Growth</h3>
-                <?php if(!empty($monthlyData)): ?>
-                    <?php foreach($monthlyData as $data): ?>
-                        <div class="report-item">
-                            <span class="label"><?= htmlspecialchars($data['month']) ?></span>
-                            <span class="value">+<?= $data['count'] ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p style="color: var(--gray-500); text-align: center; padding: 20px 0;">No data available</p>
-                <?php endif; ?>
-            </div>
-
-            <!-- Recent Activity -->
-            <div class="report-card">
-                <h3><i class="fas fa-clock"></i> Recent Activity</h3>
-                <div class="activity-list">
-                    <?php foreach($recentActivity as $activity): ?>
-                        <div class="activity-item">
-                            <div class="activity-icon added">
-                                <i class="fas fa-user-plus"></i>
-                            </div>
-                            <div class="activity-text">
-                                <span class="name"><?= htmlspecialchars($activity['full_name']) ?></span>
-                                <span class="action">was added to the system</span>
-                            </div>
-                            <span class="activity-time"><?= date('d M', strtotime($activity['created_at'])) ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if(empty($recentActivity)): ?>
-                        <p style="color: var(--gray-500); text-align: center; padding: 10px 0;">No recent activity</p>
-                    <?php endif; ?>
+        <!-- Filter Card -->
+        <div class="filter-card">
+            <h3><i class="fas fa-filter"></i> Filter Reports</h3>
+            <form method="GET" class="filter-row">
+                <div class="filter-group">
+                    <label>Report Type</label>
+                    <select name="report_type">
+                        <option value="clients" <?= $report_type == 'clients' ? 'selected' : '' ?>>Clients</option>
+                        <option value="payments" <?= $report_type == 'payments' ? 'selected' : '' ?>>Payments</option>
+                        <option value="reports" <?= $report_type == 'reports' ? 'selected' : '' ?>>Daily Reports</option>
+                    </select>
                 </div>
+                <div class="filter-group">
+                    <label>Start Date</label>
+                    <input type="date" name="start_date" value="<?= $start_date ?>">
+                </div>
+                <div class="filter-group">
+                    <label>End Date</label>
+                    <input type="date" name="end_date" value="<?= $end_date ?>">
+                </div>
+                <div class="filter-group">
+                    <label>Search</label>
+                    <input type="text" name="search" placeholder="Search..." value="<?= htmlspecialchars($search) ?>" class="search-input">
+                </div>
+                <div class="filter-group" style="flex-direction:row;gap:8px;">
+                    <button type="submit" class="btn-filter">
+                        <i class="fas fa-search"></i> Apply Filters
+                    </button>
+                    <a href="reports.php" class="btn-reset">
+                        <i class="fas fa-times"></i> Reset
+                    </a>
+                    <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&export_type=<?= $report_type ?>&search=<?= urlencode($search) ?>" class="btn-export" target="_blank">
+                        <i class="fas fa-file-excel"></i> Export Excel
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Results Table -->
+        <div class="table-container">
+            <div class="table-header">
+                <div>
+                    <h2><i class="fas fa-list"></i> <?= ucfirst($report_type) ?> Results</h2>
+                    <p class="table-subtitle">Showing <?= $total_records ?> records</p>
+                </div>
+                <span class="record-count">
+                    <i class="fas fa-database"></i> <?= $total_records ?> records
+                </span>
             </div>
 
-            <!-- Upcoming Renewals -->
-            <div class="report-card">
-                <h3><i class="fas fa-calendar-check"></i> Upcoming Renewals</h3>
-                <div class="activity-list">
-                    <?php foreach($recentExpiry as $expiry): ?>
-                        <div class="activity-item">
-                            <div class="activity-icon expiring">
-                                <i class="fas fa-clock"></i>
-                            </div>
-                            <div class="activity-text">
-                                <span class="name"><?= htmlspecialchars($expiry['full_name']) ?></span>
-                                <span class="action">renews on <?= date('d M Y', strtotime($expiry['expiry_date'])) ?></span>
-                            </div>
-                            <span class="activity-time">
-                                <?php 
-                                    $days = (new DateTime())->diff(new DateTime($expiry['expiry_date']))->days;
-                                    echo $days . 'd';
-                                ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                    <?php if(empty($recentExpiry)): ?>
-                        <p style="color: var(--gray-500); text-align: center; padding: 10px 0;">No upcoming renewals</p>
-                    <?php endif; ?>
-                </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <?php if($report_type == 'clients'): ?>
+                                <th>#</th>
+                                <th>Full Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Policy #</th>
+                                <th>Type</th>
+                                <th>Expiry</th>
+                                <th>Status</th>
+                            <?php elseif($report_type == 'payments'): ?>
+                                <th>#</th>
+                                <th>Client</th>
+                                <th>Policy</th>
+                                <th>Amount</th>
+                                <th>Method</th>
+                                <th>Transaction ID</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            <?php else: ?>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th>Total Clients</th>
+                                <th>Active</th>
+                                <th>Expired</th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if($total_records > 0): ?>
+                            <?php foreach($data as $index => $row): ?>
+                            <tr>
+                                <?php if($report_type == 'clients'): ?>
+                                    <td><?= $index + 1 ?></td>
+                                    <td><strong><?= htmlspecialchars($row['full_name']) ?></strong></td>
+                                    <td><?= htmlspecialchars($row['phone']) ?></td>
+                                    <td><?= htmlspecialchars($row['email'] ?? 'N/A') ?></td>
+                                    <td><?= htmlspecialchars($row['policy_number']) ?></td>
+                                    <td><?= htmlspecialchars($row['policy_type']) ?></td>
+                                    <td><?= date('d M Y', strtotime($row['expiry_date'])) ?></td>
+                                    <td>
+                                        <?php 
+                                        $is_expired = strtotime($row['expiry_date']) < time();
+                                        $is_expiring = !$is_expired && (strtotime($row['expiry_date']) - time()) / 86400 <= 30;
+                                        ?>
+                                        <span class="badge-status <?= $is_expired ? 'expired' : ($is_expiring ? 'expiring' : 'active') ?>">
+                                            <?= $is_expired ? 'Expired' : ($is_expiring ? 'Expiring Soon' : 'Active') ?>
+                                        </span>
+                                    </td>
+                                <?php elseif($report_type == 'payments'): ?>
+                                    <td><?= $index + 1 ?></td>
+                                    <td><?= htmlspecialchars($row['client_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['policy_number']) ?></td>
+                                    <td><?= CURRENCY_SYMBOL ?> <?= number_format($row['amount'], 2) ?></td>
+                                    <td><?= strtoupper($row['payment_method']) ?></td>
+                                    <td><?= htmlspecialchars($row['transaction_id']) ?></td>
+                                    <td><span class="badge-status <?= $row['status'] ?>"><?= ucfirst($row['status']) ?></span></td>
+                                    <td><?= date('d M Y', strtotime($row['created_at'])) ?></td>
+                                <?php else: ?>
+                                    <td><?= $index + 1 ?></td>
+                                    <td><?= date('d M Y', strtotime($row['date'])) ?></td>
+                                    <td><?= $row['total_clients'] ?></td>
+                                    <td><?= $row['active'] ?></td>
+                                    <td><?= $row['expired'] ?></td>
+                                <?php endif; ?>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="8">
+                                    <div class="empty-state">
+                                        <i class="fas fa-inbox"></i>
+                                        <h3>No records found</h3>
+                                        <p>Try adjusting your filters or date range</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 

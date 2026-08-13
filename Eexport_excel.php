@@ -8,25 +8,30 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
     exit;
 }
 
-// Get date filters
+// Get filters from URL
 $start_date = $_GET['start_date'] ?? '';
 $end_date = $_GET['end_date'] ?? '';
 $export_type = $_GET['export_type'] ?? 'clients';
+$search = $_GET['search'] ?? '';
 
 // Build query based on export type
 if ($export_type == 'clients') {
-    $sql = "SELECT * FROM clients";
+    $sql = "SELECT * FROM clients WHERE 1=1";
     $params = [];
     
     if ($start_date && $end_date) {
-        $sql .= " WHERE created_at BETWEEN ? AND ?";
-        $params = [$start_date . ' 00:00:00', $end_date . ' 23:59:59'];
-    } elseif ($start_date) {
-        $sql .= " WHERE created_at >= ?";
-        $params = [$start_date . ' 00:00:00'];
-    } elseif ($end_date) {
-        $sql .= " WHERE created_at <= ?";
-        $params = [$end_date . ' 23:59:59'];
+        $sql .= " AND created_at BETWEEN ? AND ?";
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
+    if ($search) {
+        $sql .= " AND (full_name LIKE ? OR phone LIKE ? OR policy_number LIKE ? OR email LIKE ?)";
+        $search_param = "%$search%";
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
     }
     
     $sql .= " ORDER BY created_at DESC";
@@ -40,18 +45,22 @@ if ($export_type == 'clients') {
 } elseif ($export_type == 'payments') {
     $sql = "SELECT p.*, c.full_name as client_name, c.policy_number 
             FROM payments p 
-            JOIN clients c ON p.client_id = c.id";
+            JOIN clients c ON p.client_id = c.id 
+            WHERE 1=1";
     $params = [];
     
     if ($start_date && $end_date) {
-        $sql .= " WHERE p.created_at BETWEEN ? AND ?";
-        $params = [$start_date . ' 00:00:00', $end_date . ' 23:59:59'];
-    } elseif ($start_date) {
-        $sql .= " WHERE p.created_at >= ?";
-        $params = [$start_date . ' 00:00:00'];
-    } elseif ($end_date) {
-        $sql .= " WHERE p.created_at <= ?";
-        $params = [$end_date . ' 23:59:59'];
+        $sql .= " AND p.created_at BETWEEN ? AND ?";
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
+    }
+    
+    if ($search) {
+        $sql .= " AND (c.full_name LIKE ? OR c.policy_number LIKE ? OR p.transaction_id LIKE ?)";
+        $search_param = "%$search%";
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
     }
     
     $sql .= " ORDER BY p.created_at DESC";
@@ -63,7 +72,6 @@ if ($export_type == 'clients') {
     $headers = ['ID', 'Client', 'Policy Number', 'Amount', 'Method', 'Transaction ID', 'Status', 'Payment Date', 'Created At'];
     
 } else {
-    // Reports export
     $sql = "SELECT 
                 DATE(created_at) as date,
                 COUNT(*) as total_clients,
@@ -75,13 +83,8 @@ if ($export_type == 'clients') {
     
     if ($start_date && $end_date) {
         $sql .= " AND created_at BETWEEN ? AND ?";
-        $params = [$start_date . ' 00:00:00', $end_date . ' 23:59:59'];
-    } elseif ($start_date) {
-        $sql .= " AND created_at >= ?";
-        $params = [$start_date . ' 00:00:00'];
-    } elseif ($end_date) {
-        $sql .= " AND created_at <= ?";
-        $params = [$end_date . ' 23:59:59'];
+        $params[] = $start_date . ' 00:00:00';
+        $params[] = $end_date . ' 23:59:59';
     }
     
     $sql .= " GROUP BY DATE(created_at) ORDER BY date DESC";
@@ -113,7 +116,6 @@ foreach ($data as $row) {
     echo '<tr>';
     foreach ($headers as $header) {
         $key = strtolower(str_replace(' ', '_', $header));
-        // Map headers to database columns
         $column_map = [
             'id' => 'id',
             'full_name' => 'full_name',
@@ -138,27 +140,14 @@ foreach ($data as $row) {
         $db_key = $column_map[$key] ?? $key;
         $value = $row[$db_key] ?? '';
         
-        // Format dates
         if (in_array($db_key, ['expiry_date', 'created_at', 'payment_date', 'date'])) {
             if ($value && $value != '0000-00-00') {
                 $value = date('d M Y', strtotime($value));
             }
         }
         
-        // Format amount
         if ($db_key == 'amount') {
             $value = CURRENCY_SYMBOL . ' ' . number_format($value, 2);
-        }
-        
-        // Format status
-        if ($db_key == 'status' && $export_type == 'payments') {
-            $status_colors = [
-                'completed' => 'green',
-                'pending' => 'orange',
-                'failed' => 'red',
-                'cancelled' => 'gray'
-            ];
-            $value = '<span style="color:' . ($status_colors[$value] ?? 'black') . ';">' . ucfirst($value) . '</span>';
         }
         
         echo '<td style="padding:6px;">' . htmlspecialchars($value) . '</td>';
